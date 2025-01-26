@@ -5,6 +5,7 @@ export default function Home() {
   const [number, setNumber] = useState<string>('');
   const [inputValue, setInputValue] = useState<string>('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const inactivityRef = useRef<NodeJS.Timeout | null>(null);
 
   const getCurrentDate = () => {
     const now = new Date();
@@ -14,19 +15,41 @@ export default function Home() {
     return `${day}/${month}/${year}`;
   };
 
-  const resetTimeout = () => {
+  const scheduleCheckForNextDay = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
+
+    const now = new Date();
+    const nextCheck = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 7, 0, 0);
+
+    if (now.getTime() >= nextCheck.getTime()) {
+      nextCheck.setDate(nextCheck.getDate() + 1);
+    }
+
+    const timeUntilNextCheck = nextCheck.getTime() - now.getTime();
+
     timeoutRef.current = setTimeout(() => {
-      setNumber(getCurrentDate());
-    }, 15 * 60 * 1000);
+      const newDate = getCurrentDate();
+      if (newDate !== number) {
+        setNumber(newDate);
+      }
+      scheduleCheckForNextDay();
+    }, timeUntilNextCheck);
   };
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (/^\d{0,3}$/.test(value)) {
       setInputValue(value);
+
+      if (inactivityRef.current) {
+        clearTimeout(inactivityRef.current);
+      }
+
+      inactivityRef.current = setTimeout(() => {
+        setNumber(getCurrentDate());
+      }, 15 * 60 * 1000);
     }
   };
 
@@ -34,15 +57,19 @@ export default function Home() {
     if (inputValue) {
       setNumber(inputValue);
       setInputValue('');
-      resetTimeout();
+      scheduleCheckForNextDay();
     }
   };
 
   useEffect(() => {
-    resetTimeout();
+    setNumber(getCurrentDate());
+    scheduleCheckForNextDay();
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+      }
+      if (inactivityRef.current) {
+        clearTimeout(inactivityRef.current);
       }
     };
   }, []);
